@@ -24,7 +24,7 @@ async def save_chat_messages(source_stream_reader, output_filepath):
         await append_to_file(filepath=output_filepath, text=f'{data.decode()}')
 
 
-async def run_chat_reading(
+async def run_chat_reader(
         host, port, output_filepath,
         connection_attempts_count_without_timeout=2,
         timeout_between_connection_attempts=3):
@@ -92,7 +92,7 @@ def main():
     command_line_arguments = get_command_line_arguments()
 
     asyncio.run(
-        run_chat_reading(
+        run_chat_reader(
             host=command_line_arguments.host,
             port=command_line_arguments.port,
             output_filepath=command_line_arguments.output,
