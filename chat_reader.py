@@ -18,7 +18,7 @@ async def append_to_file(filepath, text, enable_adding_datetime_info=True):
         await file.write(text)
 
 
-async def run_chat_reader(
+async def run_chat_reading_cycle(
         host, port, output_filepath,
         connection_attempts_count_without_timeout=2,
         timeout_between_connection_attempts=3):
@@ -88,7 +88,7 @@ def main():
     command_line_arguments = get_command_line_arguments()
 
     asyncio.run(
-        run_chat_reader(
+        run_chat_reading_cycle(
             host=command_line_arguments.host,
             port=command_line_arguments.port,
             output_filepath=command_line_arguments.output,
