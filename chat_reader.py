@@ -18,12 +18,6 @@ async def append_to_file(filepath, text, enable_adding_datetime_info=True):
         await file.write(text)
 
 
-async def save_chat_messages(source_stream_reader, output_filepath):
-    while True:
-        data = await source_stream_reader.readline()
-        await append_to_file(filepath=output_filepath, text=f'{data.decode()}')
-
-
 async def run_chat_reader(
         host, port, output_filepath,
         connection_attempts_count_without_timeout=2,
@@ -42,10 +36,12 @@ async def run_chat_reader(
                 filepath=output_filepath,
                 text='Connection established\n',
             )
-            await save_chat_messages(
-                source_stream_reader=reader,
-                output_filepath=output_filepath,
-            )
+            while True:
+                message = await reader.readline()
+                await append_to_file(
+                    filepath=output_filepath,
+                    text=f'{message.decode()}',
+                )
         except (socket.gaierror, ConnectionRefusedError, ConnectionResetError):
             if current_connection_attempt < connection_attempts_count_without_timeout:
                 await append_to_file(
