@@ -11,15 +11,15 @@ def add_datetime_info(text):
     return f'[{now.strftime("%d.%m.%Y %H:%M")}] {text}'
 
 
-async def append_to_file(filepath, text, enable_adding_datetime_info=True):
+async def write_to_file(file_object, text, enable_adding_datetime_info=True):
     text = add_datetime_info(text) if enable_adding_datetime_info else text
 
-    async with AIOFile(filepath, 'a') as file:
-        await file.write(text)
+    await file_object.write(text)
+    await file_object.fsync()
 
 
 async def run_chat_reading_cycle(
-        host, port, output_filepath,
+        host, port, output_file_object,
         connection_attempts_count_without_timeout=2,
         timeout_between_connection_attempts=3):
     current_connection_attempt = 0
@@ -32,29 +32,38 @@ async def run_chat_reading_cycle(
 
             current_connection_attempt = 0
 
-            await append_to_file(
-                filepath=output_filepath,
+            await write_to_file(
+                file_object=output_file_object,
                 text='Connection established\n',
             )
             while True:
                 message = await reader.readline()
-                await append_to_file(
-                    filepath=output_filepath,
+                await write_to_file(
+                    file_object=output_file_object,
                     text=f'{message.decode()}',
                 )
         except (socket.gaierror, ConnectionRefusedError, ConnectionResetError):
             if current_connection_attempt < connection_attempts_count_without_timeout:
-                await append_to_file(
-                    filepath=output_filepath,
+                await write_to_file(
+                    file_object=output_file_object,
                     text='No connection. Retrying.\n',
                 )
             else:
-                await append_to_file(
-                    filepath=output_filepath,
+                await write_to_file(
+                    file_object=output_file_object,
                     text=f'No connection. '
                          f'Retrying in {timeout_between_connection_attempts} sec.\n',
                 )
                 await asyncio.sleep(timeout_between_connection_attempts)
+
+
+async def run_chat_reader(host, port, output_filepath):
+    async with AIOFile(output_filepath, 'a') as file_object:
+        await run_chat_reading_cycle(
+            host=host,
+            port=port,
+            output_file_object=file_object,
+        )
 
 
 def get_command_line_arguments():
@@ -88,7 +97,7 @@ def main():
     command_line_arguments = get_command_line_arguments()
 
     asyncio.run(
-        run_chat_reading_cycle(
+        run_chat_reader(
             host=command_line_arguments.host,
             port=command_line_arguments.port,
             output_filepath=command_line_arguments.output,
