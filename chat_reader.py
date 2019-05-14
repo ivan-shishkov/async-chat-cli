@@ -24,12 +24,16 @@ async def run_chat_reading_cycle(
         timeout_between_connection_attempts=3):
     current_connection_attempt = 0
 
+    writer = None
+
     while True:
         try:
             current_connection_attempt += 1
 
-            reader, _ = await asyncio.open_connection(host=host, port=port)
-
+            reader, writer = await asyncio.open_connection(
+                host=host,
+                port=port,
+            )
             current_connection_attempt = 0
 
             await write_to_file(
@@ -55,6 +59,9 @@ async def run_chat_reading_cycle(
                          f'Retrying in {timeout_between_connection_attempts} sec.\n',
                 )
                 await asyncio.sleep(timeout_between_connection_attempts)
+        finally:
+            if writer:
+                writer.close()
 
 
 async def run_chat_reader(host, port, output_filepath):
