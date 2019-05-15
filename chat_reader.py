@@ -5,6 +5,8 @@ import datetime
 from aiofile import AIOFile
 import configargparse
 
+from utils import open_connection
+
 
 def add_datetime_info(text):
     now = datetime.datetime.now()
@@ -24,28 +26,23 @@ async def run_chat_reading_cycle(
         timeout_between_connection_attempts=3):
     current_connection_attempt = 0
 
-    writer = None
-
     while True:
         try:
             current_connection_attempt += 1
 
-            reader, writer = await asyncio.open_connection(
-                host=host,
-                port=port,
-            )
-            current_connection_attempt = 0
+            async with open_connection(host=host, port=port) as (reader, writer):
+                current_connection_attempt = 0
 
-            await write_to_file(
-                file_object=output_file_object,
-                text='Connection established\n',
-            )
-            while True:
-                message = await reader.readline()
                 await write_to_file(
                     file_object=output_file_object,
-                    text=f'{message.decode()}',
+                    text='Connection established\n',
                 )
+                while True:
+                    message = await reader.readline()
+                    await write_to_file(
+                        file_object=output_file_object,
+                        text=f'{message.decode()}',
+                    )
         except (socket.gaierror, ConnectionRefusedError, ConnectionResetError):
             if current_connection_attempt < connection_attempts_count_without_timeout:
                 await write_to_file(
@@ -59,9 +56,6 @@ async def run_chat_reading_cycle(
                          f'Retrying in {timeout_between_connection_attempts} sec.\n',
                 )
                 await asyncio.sleep(timeout_between_connection_attempts)
-        finally:
-            if writer:
-                writer.close()
 
 
 async def run_chat_reader(host, port, output_filepath):
