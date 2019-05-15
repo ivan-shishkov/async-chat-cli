@@ -5,10 +5,10 @@ import sys
 
 import configargparse
 
+from utils import open_connection
 
-async def register(host, port, nickname):
-    reader, writer = await asyncio.open_connection(host=host, port=port)
 
+async def register(reader, writer, nickname):
     greeting_message = await reader.readline()
     logging.debug(f'Received: {greeting_message.decode().strip()}')
 
@@ -24,14 +24,10 @@ async def register(host, port, nickname):
     user_credentials_message = await reader.readline()
     logging.debug(f'Received: {user_credentials_message.decode().strip()}')
 
-    writer.close()
-
     return json.loads(user_credentials_message.decode())
 
 
-async def authorise(host, port, auth_token):
-    reader, writer = await asyncio.open_connection(host=host, port=port)
-
+async def authorise(reader, writer, auth_token):
     greeting_message = await reader.readline()
     logging.debug(f'Received: {greeting_message.decode().strip()}')
 
@@ -42,10 +38,9 @@ async def authorise(host, port, auth_token):
     logging.debug(f'Received: {user_credentials_message.decode().strip()}')
 
     if json.loads(user_credentials_message.decode()) is None:
-        writer.close()
-        return None
+        return False
 
-    return reader, writer
+    return True
 
 
 async def submit_message(reader, writer, message):
@@ -64,41 +59,39 @@ async def run_chat_writer(host, port, nickname, auth_token, message):
     if nickname and not auth_token:
         logging.info('Auth token not given. Executing user registration...')
 
-        user_credentials = await register(
-            host=host,
-            port=port,
-            nickname=nickname,
-        )
+        async with open_connection(host=host, port=port) as (reader, writer):
+            user_credentials = await register(
+                reader=reader,
+                writer=writer,
+                nickname=nickname,
+            )
         auth_token = user_credentials['account_hash']
 
         logging.info(f'Registered successfully. Your auth token: {auth_token}')
 
-    logging.info('Executing user authorisation...')
+    async with open_connection(host=host, port=port) as (reader, writer):
+        logging.info('Executing user authorisation...')
 
-    stream_handlers = await authorise(
-        host=host,
-        port=port,
-        auth_token=auth_token,
-    )
+        is_successfully_authorised = await authorise(
+            reader=reader,
+            writer=writer,
+            auth_token=auth_token,
+        )
 
-    if stream_handlers is None:
-        logging.info('Unknown token. Check it or re-register.')
-        return
+        if not is_successfully_authorised:
+            logging.info('Unknown token. Check it or re-register.')
+            return
 
-    logging.info('Successfully authorised')
+        logging.info('Successfully authorised')
 
-    reader, writer = stream_handlers
+        logging.info('Sending message...')
 
-    logging.info('Sending message...')
-
-    await submit_message(
-        reader=reader,
-        writer=writer,
-        message=message,
-    )
-    logging.info('Message sent successfully')
-
-    writer.close()
+        await submit_message(
+            reader=reader,
+            writer=writer,
+            message=message,
+        )
+        logging.info('Message sent successfully')
 
 
 def get_command_line_arguments():
